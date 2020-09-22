@@ -1,7 +1,7 @@
 import numpy as np
 from tqdm import tqdm
 from scipy.ndimage import gaussian_filter
-from numpy.random import normal
+from numpy.random import normal, poisson
 import uproot
 """
 This class is created to process to output from CORSIKA Cherenkov output files (after conversion to ROOT TTrees)
@@ -140,7 +140,8 @@ class IACTArray:
         return gaussian_filter(images, sigma=(0, 0, psf_width, psf_width))
 
     @staticmethod
-    def _apply_efficiency(images, mirror_reflectivity=0.8, quantum_efficiency=0.2, pedestal_width=1, **kwargs):
+    def _apply_efficiency(images, mirror_reflectivity=0.8, quantum_efficiency=0.2,
+                          single_pe_width=0.5, pedestal_width=1, **kwargs):
         """
         Apply scaling factor to simulate the efficiency of the mirrors and photodetectors. Add random gaussian
         pedestal values
@@ -157,6 +158,9 @@ class IACTArray:
         """
         scaled_images = images * mirror_reflectivity * quantum_efficiency
         pedestal = normal(0, pedestal_width, images.shape)
+
+        scaled_images = poisson(scaled_images)
+        scaled_images = normal(scaled_images, single_pe_width * scaled_images)
         return scaled_images + pedestal
 
     def scale_to_photoelectrons(self, **kwargs):
