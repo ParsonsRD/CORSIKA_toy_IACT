@@ -1,5 +1,8 @@
 import numpy as np
 from tqdm import tqdm
+from scipy.ndimage import gaussian_filter
+from numpy.random import normal
+import uproot
 """
 """
 
@@ -27,16 +30,23 @@ class IACTArray:
         self.images = None
 
     @staticmethod
-    def get_event_numbers(photon_list):
+    def _get_event_numbers(photon_list):
+        """
+
+        :param photon_list:
+        :return:
+        """
         events = photon_list["event"]
         return np.unique(events)
 
     def process_images(self, photon_list):
+        """
 
-        event_nums = self.get_event_numbers(photon_list)
-        num_events = event_nums.shape[0]
-        new_images = np.zeros((num_events, self.num_telescope, self.camera_axis_bins, self.camera_axis_bins))
+        :param photon_list:
+        :return:
+        """
 
+        event_nums = self._get_event_numbers(photon_list)
         image_list = []
 
         print('Processing images')
@@ -74,3 +84,47 @@ class IACTArray:
             self.images = np.append(self.images, image_list, 0)
 
         return image_list
+
+    def process_file_list(self, file_list):
+        """
+
+        :param file_list:
+        :return:
+        """
+
+        for file in file_list:
+            events = uproot.open(file)["photons"]
+            branches = events.arrays(["event", "x", "y", "u", "v", "s"], namedecode="utf-8")
+            self.process_images(branches)
+
+    def _apply_optical_psf(self, images, psf_width, **kwargs):
+        """
+
+        :param images:
+        :param psf_width:
+        :return:
+        """
+        psf_width = psf_width * (self.camera_axis_bins / (self.camera_radius * 2))
+        return gaussian_filter(images, sigma=(0, 0, psf_width, psf_width))
+
+    @staticmethod
+    def _apply_efficiency(images, mirror_reflectivity=0.8, quantum_efficiency=0.2, pedestal_width=1, **kwargs):
+        """
+
+        :param images:
+        :param mirror_reflectivity:
+        :param quantum_efficiency:
+        :param pedestal_width:
+        :return:
+        """
+        scaled_images = images * mirror_reflectivity * quantum_efficiency
+        pedestal = normal(0, pedestal_width, images.shape)
+        return scaled_images + pedestal
+
+    def scale_to_photoelectrons(self, **kwargs):
+        """
+
+        :return:
+        """
+        smoothed_images = self._apply_optical_psf(self.images, **kwargs)
+        return self._apply_efficiency(smoothed_images, **kwargs)
