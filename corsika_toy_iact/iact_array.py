@@ -2,7 +2,7 @@ import numpy as np
 from tqdm import tqdm
 from scipy.ndimage import gaussian_filter
 from numpy.random import normal, poisson
-import uproot
+import uproot as uproot
 """
 This class is created to process to output from CORSIKA Cherenkov output files (after conversion to ROOT TTrees)
 This output can then be read and processed to simply simulate the behaviour of IACTs. This is done by simply binning 
@@ -118,6 +118,7 @@ class IACTArray:
         :param file_list: list
             List of files to read in
         """
+        self.reset()
 
         for file in file_list:
             print('Reading', file)
@@ -125,6 +126,8 @@ class IACTArray:
             events = uproot.open(file)["photons"]
             branches = events.arrays(["event", "x", "y", "u", "v", "s"], namedecode="utf-8")
             self.process_images(branches)
+
+        return self.images
 
     def _apply_optical_psf(self, images, psf_width, **kwargs):
         """
@@ -171,3 +174,6 @@ class IACTArray:
         """
         smoothed_images = self._apply_optical_psf(self.images, **kwargs)
         return self._apply_efficiency(smoothed_images, **kwargs)
+
+    def reset(self):
+        self.images = None
