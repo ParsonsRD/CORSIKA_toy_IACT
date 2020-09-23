@@ -2,6 +2,7 @@
 name: corsika_toy_iacr
 channels:
   - default
+  - conda-forge
 dependencies:
   - matplotlib
   - numpy>=1.15.4
