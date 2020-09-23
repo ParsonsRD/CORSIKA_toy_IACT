@@ -1,0 +1,14 @@
+# Conda environment
+name: corsika_toy_iacr
+channels:
+  - default
+dependencies:
+  - matplotlib
+  - numpy>=1.15.4
+  - pytest
+  - pytest-cov
+  - pytest-runner
+  - scipy
+  - setuptools
+  - tqdm
+  - uproot
