@@ -34,14 +34,14 @@ install:
     - ls
     - pwd
     - conda env create --name corsika_toy_iact --file environment.yml python=$PYTHON_VERSION
-    - source activate template_builder
+    - source activate corsika_toy_iact
     - ulimit -s 16000  # increase stack size limit, for libhessio
     - pip install travis-sphinx
     - pip install codecov
     - python setup.py develop
 
 script:
-    - pytest --cov=template_builder
+    - pytest --cov=corsika_toy_iact
 
 after_script:
     - source deactivate
