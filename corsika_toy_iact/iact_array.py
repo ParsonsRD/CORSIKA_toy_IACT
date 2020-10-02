@@ -162,8 +162,8 @@ class IACTArray:
         scaled_images = images * mirror_reflectivity * quantum_efficiency
         pedestal = normal(0, pedestal_width, images.shape)
 
-        scaled_images = poisson(scaled_images)
-        scaled_images = normal(scaled_images, single_pe_width * scaled_images)
+        #scaled_images = np.round(scaled_images)
+        scaled_images = normal(scaled_images, np.sqrt(scaled_images) * single_pe_width)
         return scaled_images + pedestal
 
     def scale_to_photoelectrons(self, **kwargs):
