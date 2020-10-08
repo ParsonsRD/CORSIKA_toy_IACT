@@ -50,7 +50,7 @@ class IACTArray:
         :return: ndarray
             Array of unique event numbers
         """
-        events = photon_list["event"].array(library="np")
+        events = photon_list["event"]
         return np.unique(events)
 
     def process_images(self, photon_list):
@@ -73,17 +73,17 @@ class IACTArray:
         for event in tqdm(event_nums):
 
             # Select the photons from the list belonging to this event
-            selection = photon_list["event"].array(library="np") == event
+            selection = photon_list["event"] == event
             # Photons positions in m
-            x = photon_list["x"].array(library="np")[selection]/100
-            y = photon_list["y"].array(library="np")[selection]/100
+            x = photon_list["x"][selection]/100
+            y = photon_list["y"][selection]/100
 
             # Photons directions in deg
-            u = np.rad2deg(photon_list["u"].array(library="np")[selection])
-            v = np.rad2deg(photon_list["v"].array(library="np")[selection])
+            u = np.rad2deg(photon_list["u"][selection])
+            v = np.rad2deg(photon_list["v"][selection])
 
             # Weight of each photon
-            weights = photon_list["s"].array(library="np")[selection]
+            weights = photon_list["s"][selection]
 
             # Calculate which telescope each photon belongs to
             r = np.sqrt(np.power(x[:, np.newaxis] - self.telescope_x_positions, 2) +
@@ -125,7 +125,7 @@ class IACTArray:
             print('Reading', file)
 
             events = uproot.open(file)
-            branches = events["photons"]
+            branches = events["photons"].arrays(library="np")
             self.process_images(branches)
 
         return self.images
