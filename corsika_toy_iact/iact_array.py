@@ -30,6 +30,7 @@ class IACTArray:
         telescope_positions = np.array(telescope_positions)
         self.telescope_x_positions = telescope_positions.T[0]
         self.telescope_y_positions = telescope_positions.T[1]
+        print(self.telescope_x_positions)
 
         self.telescope_radius = radius
         self.camera_radius = camera_size/2.
@@ -91,11 +92,10 @@ class IACTArray:
             telescope_selection *= tel_list[np.newaxis, :]
 
             telescope_seen = np.sum(telescope_selection, axis=1)
-
             # Then bin our photons
             content, edges = np.histogramdd((telescope_seen, u, v),
                                             bins=(self.num_telescope, self.camera_axis_bins, self.camera_axis_bins),
-                                            range=((0.5, self.num_telescope+1.5),
+                                            range=((0.5, self.num_telescope+0.5),
                                                    (-self.camera_radius, self.camera_radius),
                                                    (-self.camera_radius, self.camera_radius)),
                                             weights=weights)
@@ -174,6 +174,18 @@ class IACTArray:
         """
         smoothed_images = self._apply_optical_psf(self.images, **kwargs)
         return self._apply_efficiency(smoothed_images, **kwargs)
+
+    def get_camera_geometry(self):
+        """
+        Get ctapipe style camera object for our simulated camera type.
+        Object returns results in m, but can ignore this.
+        :return: CameraGeometry
+            Camera geometry object
+        """
+        from ctapipe.instrument import CameraGeometry
+        return CameraGeometry.make_rectangular(self.camera_axis_bins, self.camera_axis_bins,
+                                               range_x=(-1*self.camera_radius,  self.camera_radius),
+                                               range_y=(-1*self.camera_radius,  self.camera_radius))
 
     def reset(self):
         self.images = None

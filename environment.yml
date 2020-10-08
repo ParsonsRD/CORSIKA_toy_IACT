@@ -3,6 +3,7 @@ name: corsika_toy_iacr
 channels:
   - default
   - conda-forge
+  - cta-observatory
 dependencies:
   - matplotlib
   - numpy>=1.15.4
@@ -13,3 +14,4 @@ dependencies:
   - setuptools
   - tqdm
   - uproot
+  - ctapipe==0.8.0

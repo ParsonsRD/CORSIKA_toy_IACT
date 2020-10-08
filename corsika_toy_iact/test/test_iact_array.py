@@ -75,3 +75,12 @@ def test_combined():
                                                        pedestal_width=0., single_pe_width=0., psf_width=0.05)
 
     assert np.allclose(np.sum(images * 0.01), np.sum(scaled_images), rtol=0.05)
+
+
+def test_geometry():
+    iact_array.reset()
+    geom = iact_array.get_camera_geometry()
+    x, y = np.meshgrid(np.linspace(-0.5, 0.5, 80), np.linspace(-0.5, 0.5, 80))
+
+    assert np.allclose(geom.pix_x.value, x.ravel())
+    assert np.allclose(geom.pix_y.value, y.ravel())
