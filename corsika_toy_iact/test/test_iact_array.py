@@ -1,14 +1,14 @@
 import corsika_toy_iact.iact_array as iact
 import pkg_resources
-import uproot as uproot
+import uproot4 as uproot
 import numpy as np
 
 iact_array = iact.IACTArray([[0., 0.], [0., 20.]], radius=5, camera_size=1)
 data_dir = pkg_resources.resource_filename('corsika_toy_iact', 'data/')
 file = data_dir + "test_data.root"
 
-events = uproot.open(file)["photons"]
-branches = events.arrays(["event", "x", "y", "u", "v", "s"], namedecode="utf-8")
+events = uproot.open(file)
+branches = events["photons"]
 
 
 def test_event_numbers():
@@ -26,14 +26,16 @@ def test_reading():
 def test_sums():
     iact_array.reset()
     images = iact_array.process_images(branches)
-    event_sel = branches["event"] == 1
-    r = np.sqrt(branches["x"] * branches["x"] + branches["y"] * branches["y"])
+    event_sel = branches["event"].array(library="np") == 1
+    r = np.sqrt(branches["x"].array(library="np") * branches["x"].array(library="np") +
+                branches["y"].array(library="np") * branches["y"].array(library="np"))
 
     radius_sel = np.logical_and(r < 5 * 100, event_sel)
-    fov_sel = np.logical_and(np.abs(np.rad2deg(branches["u"])) < 0.5, np.abs(np.rad2deg(branches["v"])) < 0.5)
+    fov_sel = np.logical_and(np.abs(np.rad2deg(branches["u"].array(library="np"))) < 0.5,
+                             np.abs(np.rad2deg(branches["v"].array(library="np"))) < 0.5)
 
     photon_sel = np.logical_and(radius_sel, fov_sel)
-    assert np.sum(branches["s"][photon_sel]) == np.sum(images[0][0])
+    assert np.sum(branches["s"].array(library="np")[photon_sel]) == np.sum(images[0][0])
 
 
 def test_read_list():

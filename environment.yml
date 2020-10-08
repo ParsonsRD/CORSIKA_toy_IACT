@@ -13,5 +13,5 @@ dependencies:
   - scipy
   - setuptools
   - tqdm
-  - uproot
+  - uproot4
   - ctapipe==0.8.0
