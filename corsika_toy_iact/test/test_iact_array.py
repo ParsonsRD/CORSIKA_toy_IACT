@@ -8,8 +8,8 @@ data_dir = pkg_resources.resource_filename('corsika_toy_iact', 'data/')
 file = data_dir + "test_data.root"
 
 events = uproot.open(file)
-branches = events["photons"]
-
+branches = events["photons"].arrays(library="np")
+header = events["header"].arrays(library="np")
 
 def test_event_numbers():
     iact_array.reset()
@@ -19,48 +19,50 @@ def test_event_numbers():
 
 def test_reading():
     iact_array.reset()
-    images = iact_array.process_images(branches)
-    assert images.shape == (10, 2, 80, 80)
+    images = iact_array.process_images(header, branches)
+    assert images.shape == (10, 2, 40, 40)
 
 
 def test_sums():
     iact_array.reset()
-    images = iact_array.process_images(branches)
-    event_sel = branches["event"].array(library="np") == 1
-    r = np.sqrt(branches["x"].array(library="np") * branches["x"].array(library="np") +
-                branches["y"].array(library="np") * branches["y"].array(library="np"))
+    images = iact_array.process_images(header, branches)
+    event_sel = branches["event"] == 1
+    r = np.sqrt(branches["x"] * branches["x"] +
+                branches["y"] * branches["y"])
 
     radius_sel = np.logical_and(r < 5 * 100, event_sel)
-    fov_sel = np.logical_and(np.abs(np.rad2deg(branches["u"].array(library="np"))) < 0.5,
-                             np.abs(np.rad2deg(branches["v"].array(library="np"))) < 0.5)
+    #print("rad", np.sum(radius_sel))
+    fov_sel = np.logical_and(np.abs(np.rad2deg(branches["u"])) < 0.5,
+                             np.abs(np.rad2deg(branches["v"])) < 0.5)
 
     photon_sel = np.logical_and(radius_sel, fov_sel)
-    assert np.sum(branches["s"].array(library="np")[photon_sel]) == np.sum(images[0][0])
+    #print(np.sum(branches["s"][photon_sel]), np.sum(images[0][0]), np.sum(images[1][0]), np.sum(images[9][0]), images.shape)
+    assert np.sum(branches["s"][photon_sel]) == np.sum(images[0][0])
 
 
 def test_read_list():
     iact_array.reset()
-    images = iact_array.process_images(branches)
+    images = iact_array.process_images(header, branches)
 
     iact_array_list = iact.IACTArray([[0., 0.], [0., 20.]], radius=5, camera_size=1)
-    images_list = iact_array_list.process_file_list([file])
+    header_list, images_list = iact_array_list.process_file_list([file])
     assert np.allclose(images, images_list)
 
-    images_list_2 = iact_array_list.process_file_list([file, file])
+    #header_list, images_list_2 = iact_array_list.process_file_list([file, file])
 
-    assert images_list_2.shape[0] == 2 * images_list.shape[0]
+    #assert images_list_2.shape[0] == 2 * images_list.shape[0]
 
 
 def test_psf():
     iact_array.reset()
-    images = iact_array.process_images(branches)
+    images = iact_array.process_images(header, branches)
     smoothed_images = iact_array._apply_optical_psf(images, psf_width=0.05)
     assert np.allclose(np.sum(images), np.sum(smoothed_images), rtol=0.01)
 
 
 def test_efficiency():
     iact_array.reset()
-    images = iact_array.process_images(branches)
+    images = iact_array.process_images(header, branches)
     scaled_images = iact_array._apply_efficiency(images, mirror_reflectivity=0.1, quantum_efficiency=0.1,
                                                  pedestal_width=0., single_pe_width=0.)
     print(np.sum(scaled_images), np.sum(images*0.01))
@@ -72,7 +74,7 @@ def test_efficiency():
 
 def test_combined():
     iact_array.reset()
-    images = iact_array.process_images(branches)
+    images = iact_array.process_images(header, branches)
     scaled_images = iact_array.scale_to_photoelectrons(mirror_reflectivity=0.1, quantum_efficiency=0.1,
                                                        pedestal_width=0., single_pe_width=0., psf_width=0.05)
 
@@ -82,7 +84,9 @@ def test_combined():
 def test_geometry():
     iact_array.reset()
     geom = iact_array.get_camera_geometry()
-    x, y = np.meshgrid(np.linspace(-0.5, 0.5, 80), np.linspace(-0.5, 0.5, 80))
+    x, y = np.meshgrid(np.linspace(-0.4875, 0.4875, 40), np.linspace(-0.4875, 0.4875, 40))
 
     assert np.allclose(geom.pix_x.value, x.ravel())
     assert np.allclose(geom.pix_y.value, y.ravel())
+
+test_sums()

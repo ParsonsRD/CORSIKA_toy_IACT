@@ -17,7 +17,7 @@ this number of photons to a number of photoelectrons as typically measured in a 
 
 class IACTArray:
 
-    def __init__(self, telescope_positions, radius=5, camera_size=8, bins=40):
+    def __init__(self, telescope_positions, radius=5, camera_size=8, bins=40, multiple_cores=False):
         """
         :param telescope_positions: ndarray
             X, Y positions of telescopes of ground (N, 2)
@@ -40,6 +40,7 @@ class IACTArray:
 
         self.num_telescope = telescope_positions.shape[0]
         self.images = None
+        self.multiple_cores = multiple_cores
 
     @staticmethod
     def _get_event_numbers(photon_list):
@@ -67,6 +68,7 @@ class IACTArray:
 
         # First get our list of unique event numbers
         event_nums = header["event"]#self._get_event_numbers(header)
+        print(event_nums)
         image_list = []
         event_count = 0
         array_pointing = AltAz(alt=90*units.deg, az=0*units.deg)
@@ -76,7 +78,11 @@ class IACTArray:
         # Then loop over the events
         for event in tqdm(event_nums):
 
-            event_base = int(np.floor(event/100.))
+            if self.multiple_cores:
+                event_base = int(np.floor(event / 100.))
+            else:
+                event_base = event
+
             # Select the photons from the list belonging to this event
             selection = photon_list["event"] == event_base
 
@@ -86,17 +92,17 @@ class IACTArray:
                 y = photon_list["y"][selection]/100
 
                 # Photons directions in deg
-                u = photon_list["u"][selection]
-                v = photon_list["v"][selection]
-
+                u = photon_list["u"][selection] * (180/np.pi)
+                v = photon_list["v"][selection] * (180/np.pi)
+                print(u)
                 # Weight of each photon
                 weights = photon_list["s"][selection]
                 previous_event = event_base
 
-                try:
-                    core_x = header["core_x"][event_count]
-                    core_y = header["core_y"][event_count]
-                except:
+                if self.multiple_cores:
+                    core_x = header["core_x"][selection]
+                    core_y = header["core_y"][selection]
+                else:
                     core_x = 0
                     core_y = 0
 
@@ -105,11 +111,11 @@ class IACTArray:
                         np.power(y[:, np.newaxis] - (self.telescope_y_positions + core_y), 2))
 
             telescope_selection = np.array(r < self.telescope_radius, np.int)
+
             tel_list = np.arange(1, self.num_telescope+1)
             telescope_selection *= tel_list[np.newaxis, :]
 
             telescope_seen = np.sum(telescope_selection, axis=1)
-
 
             # Then bin our photons
             content, edges = np.histogramdd((telescope_seen, u, v),
@@ -124,6 +130,7 @@ class IACTArray:
 
         # And add ont our array for all files
         image_list = np.array(image_list)
+        print("s", np.sum(image_list[0][0]))
         if self.images is None:
             self.images = image_list
         else:
