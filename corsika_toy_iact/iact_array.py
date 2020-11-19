@@ -93,9 +93,16 @@ class IACTArray:
                 weights = photon_list["s"][selection]
                 previous_event = event_base
 
+                try:
+                    core_x = header["core_x"][event_count]
+                    core_y = header["core_y"][event_count]
+                except:
+                    core_x = 0
+                    core_y = 0
+
             # Calculate which telescope each photon belongs to
-            r = np.sqrt(np.power(x[:, np.newaxis] - (self.telescope_x_positions + header["core_x"][event_count]), 2) +
-                        np.power(y[:, np.newaxis] - (self.telescope_y_positions + header["core_y"][event_count]), 2))
+            r = np.sqrt(np.power(x[:, np.newaxis] - (self.telescope_x_positions + core_x), 2) +
+                        np.power(y[:, np.newaxis] - (self.telescope_y_positions + core_y), 2))
 
             telescope_selection = np.array(r < self.telescope_radius, np.int)
             tel_list = np.arange(1, self.num_telescope+1)
