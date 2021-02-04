@@ -68,7 +68,7 @@ class IACTArray:
 
         # First get our list of unique event numbers
         event_nums = header["event"]#self._get_event_numbers(header)
-        print(event_nums)
+
         image_list = []
         event_count = 0
         array_pointing = AltAz(alt=90*units.deg, az=0*units.deg)
@@ -94,7 +94,7 @@ class IACTArray:
                 # Photons directions in deg
                 u = photon_list["u"][selection] * (180/np.pi)
                 v = photon_list["v"][selection] * (180/np.pi)
-                print(u)
+
                 # Weight of each photon
                 weights = photon_list["s"][selection]
                 previous_event = event_base
@@ -130,7 +130,7 @@ class IACTArray:
 
         # And add ont our array for all files
         image_list = np.array(image_list)
-        print("s", np.sum(image_list[0][0]))
+
         if self.images is None:
             self.images = image_list
         else:
@@ -163,7 +163,7 @@ class IACTArray:
 
         return header_array, self.images.astype(np.float32)
 
-    def _apply_optical_psf(self, images, psf_width, **kwargs):
+    def _apply_optical_psf(self, images, psf_width=0.01, **kwargs):
         """
         Smooth the images with the a gaussian kernel to represent the PSF of the telescope
         :param images: ndarray
@@ -215,6 +215,27 @@ class IACTArray:
         image_mask = image_sum > photon_cut
         return image_mask[:, :, np.newaxis, np.newaxis]
 
+    @staticmethod
+    def _apply_random_mispointing(images, mispointing=0.):
+        """
+
+        :param images:
+        :param mispointing:
+        :return:
+        """
+        from scipy.ndimage.interpolation import shift
+
+        if mispointing == 0.:
+            return images
+
+        num_tels = images.shape[1]
+        telescope_mispointing = normal(0, mispointing, (num_tels, 2))
+
+        for ev in range(images.shape[1]):
+            for tel in range(num_tels):
+                images[ev][tel] = shift(images[ev][tel], shift=telescope_mispointing[tel])
+        return images
+
     def scale_to_photoelectrons(self, **kwargs):
         """
         Apply both efficiency smoothing in one step
@@ -223,6 +244,7 @@ class IACTArray:
         """
 
         smoothed_images = self._apply_optical_psf(self.images, **kwargs)
+        smoothed_images = self._apply_random_mispointing(smoothed_images, **kwargs)
         return self._apply_efficiency(smoothed_images, **kwargs) * self._apply_photon_cut(self.images, **kwargs)
 
     def get_camera_geometry(self):
