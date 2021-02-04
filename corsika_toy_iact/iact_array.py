@@ -94,14 +94,14 @@ class IACTArray:
                 # Photons directions in deg
                 u = photon_list["u"][selection] * (180/np.pi)
                 v = photon_list["v"][selection] * (180/np.pi)
-                print(u)
+                #print(u)
                 # Weight of each photon
                 weights = photon_list["s"][selection]
                 previous_event = event_base
 
                 if self.multiple_cores:
-                    core_x = header["core_x"][selection]
-                    core_y = header["core_y"][selection]
+                    core_x = header["core_x"][event_count]
+                    core_y = header["core_y"][event_count]
                 else:
                     core_x = 0
                     core_y = 0
