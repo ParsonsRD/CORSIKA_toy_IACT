@@ -1,7 +1,7 @@
 import numpy as np
 from tqdm import tqdm
 from scipy.ndimage import gaussian_filter
-from numpy.random import normal, poisson
+from numpy.random import normal, poisson, lognormal
 import uproot4 as uproot
 from ctapipe.coordinates import AltAz, NominalFrame
 import astropy.units as units
@@ -178,7 +178,7 @@ class IACTArray:
 
     @staticmethod
     def _apply_efficiency(images, mirror_reflectivity=0.8, quantum_efficiency=0.2,
-                          single_pe_width=0.5, pedestal_width=1, **kwargs):
+                          single_pe_width=0.5, pedestal_width=1, miscalibration_fraction=0, **kwargs):
         """
         Apply scaling factor to simulate the efficiency of the mirrors and photodetectors. Add random gaussian
         pedestal values
@@ -198,7 +198,11 @@ class IACTArray:
 
         # Should we round here for Poisson?
         scaled_images = normal(scaled_images, np.sqrt(scaled_images) * single_pe_width)
-        return scaled_images + pedestal
+        scaled_images = scaled_images + pedestal
+
+        if miscalibration_fraction > 0.:
+            scaled_images = lognormal(scaled_images, scaled_images*miscalibration_fraction)
+        return scaled_images
 
     @staticmethod
     def _apply_photon_cut(images, photon_cut=10, **kwargs):
