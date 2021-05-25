@@ -86,29 +86,26 @@ class IACTArray:
             # Select the photons from the list belonging to this event
             selection = photon_list["event"] == event_base
 
-            if event_base != previous_event:
-                # Photons positions in m
-                x = photon_list["x"][selection]/100
-                y = photon_list["y"][selection]/100
+            # Photons positions in m
+            x = photon_list["x"][selection]/100
+            y = photon_list["y"][selection]/100
 
-                # Photons directions in deg
-                u = photon_list["u"][selection] * (180/np.pi)
-                v = photon_list["v"][selection] * (180/np.pi)
+            # Photons directions in deg
+            u = photon_list["u"][selection] * (180/np.pi)
+            v = photon_list["v"][selection] * (180/np.pi)
 
-                # Weight of each photon
-                weights = photon_list["s"][selection]
-                previous_event = event_base
+            # Weight of each photon
+            weights = photon_list["s"][selection]
 
-                if self.multiple_cores:
-                    core_x = header["core_x"][event_count]
-                    core_y = header["core_y"][event_count]
-                else:
-                    core_x = 0
-                    core_y = 0
+            if self.multiple_cores:
+                core_x = header["core_x"][event_count]
+                core_y = header["core_y"][event_count]
+            else:
+                core_x = 0
+                core_y = 0
 
-            # Calculate which telescope each photon belongs to
-            r = np.sqrt(np.power(x[:, np.newaxis] - (self.telescope_x_positions + core_x), 2) +
-                        np.power(y[:, np.newaxis] - (self.telescope_y_positions + core_y), 2))
+            r = np.sqrt(np.power(x[:, np.newaxis] - (core_x - self.telescope_x_positions), 2) +
+                        np.power(y[:, np.newaxis] - (core_y - self.telescope_y_positions), 2))
 
             telescope_selection = np.array(r < self.telescope_radius, np.int)
 
@@ -133,6 +130,7 @@ class IACTArray:
 
         if self.images is None:
             self.images = image_list
+
         else:
             self.images = np.append(self.images, image_list, 0)
 
@@ -220,7 +218,7 @@ class IACTArray:
         return image_mask[:, :, np.newaxis, np.newaxis]
 
     @staticmethod
-    def _apply_random_mispointing(images, mispointing=0.):
+    def _apply_random_mispointing(images, mispointing=0., **kwargs):
         """
 
         :param images:
