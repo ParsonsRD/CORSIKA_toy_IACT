@@ -98,6 +98,10 @@ __pypackages__/
 celerybeat-schedule
 celerybeat.pid
 
+#data source file
+*.root
+corsika_toy_iact/save_dir/
+
 # SageMath parsed files
 *.sage.py
 
@@ -127,3 +131,15 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+.DS_Store
+.idea/.gitignore
+.idea/CORSIKA_toy_IACT.iml
+.idea/misc.xml
+.idea/modules.xml
+.idea/vcs.xml
+.idea/inspectionProfiles/profiles_settings.xml
+corsika_toy_iact/.DS_Store
+corsika_toy_iact/data/epos_1TeV_cher.root
+corsika_toy_iact/data/CER000001.root
+corsika_toy_iact/data/epos_10TeV_cher.root
+.gitignore
