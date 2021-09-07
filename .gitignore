@@ -101,7 +101,7 @@ celerybeat.pid
 #data source file
 *.root
 corsika_toy_iact/save_dir/
-
+corsika_toy_iact/data/
 # SageMath parsed files
 *.sage.py
 

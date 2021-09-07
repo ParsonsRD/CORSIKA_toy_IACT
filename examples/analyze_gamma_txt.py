@@ -21,7 +21,7 @@ def readfile(datafile):
 
     return res
 
-    # Actual interpolation used later
+    # Interpolation used later
 def find_exp_value(lookuptable,xaxis ,yaxis ,xval,yval):
     xaxis_cent = xaxis[:-1] + np.diff(xaxis)/2
     yaxis_cent = yaxis[:-1] + np.diff(yaxis)/2
@@ -29,23 +29,36 @@ def find_exp_value(lookuptable,xaxis ,yaxis ,xval,yval):
     exp_val = interpol((xval,yval))
     return exp_val #print('exp val using interpolation:', exp_val),
 
+    #
+def calc_SC_Value(val, exp, std, boundary = 10000):
+    SC_val = (val - exp) / std
+    SC_nonnan = SC_val[~np.isnan(SC_val)]
+    SC_noninf = SC_nonnan[~np.isinf(SC_nonnan)]
+    SC_no_min = SC_noninf[SC_noninf>-boundary]
+    SC_no_max = SC_no_min[SC_no_min<boundary]
+    return SC_no_max
+
+
+
     # setting up the filepaths
 save_dir = pkg_resources.resource_filename('corsika_toy_iact', 'save_dir/gammas_0deg/')
 #gamma001 = save_dir+"./CER000101.root.txt"
 
-length_value_array = []
-length_interpol_array = []
-std_length_interpol_array = []
+#length_value_array = []
+#length_interpol_array = []
+#std_length_interpol_array = []
 SCL_array = []
 avg_SCL_array = []
+SCL_hist_array = []
 
-width_value_array = []
-width_interpol_array = []
-std_width_interpol_array = []
+#width_value_array = []
+#width_interpol_array = []
+#std_width_interpol_array = []
 SCW_array = []
 avg_SCW_array = []
+SCW_hist_array = []
 
-for i in range (1,11): #201
+for i in range (1,10): #201
     if i < 10:
         data_i = 'CER00000' + str(i) + '.image.npz.txt'
     elif i > 9 and i < 100 and i != 37 and i != 76 and i != 77 and i != 93:
@@ -57,13 +70,9 @@ for i in range (1,11): #201
     elif i > 201 : break
 
     print('calculating dataset:', data_i)
-#for i in range (10,100):
-    #data_i ='CER0000' + str(i) + '.image.npz'
-#for i in range (100,201):
-    #data_i = 'CER000' + str(i) + '.image.npz'
 
-    filepath_i = save_dir+data_i
     # actually reading in and naming the dataset
+    filepath_i = save_dir+data_i
     res = readfile(filepath_i)
     bins = 100
     intensity   = np.reshape(np.log10(res['#intensity']), (10000, 9))
@@ -90,27 +99,7 @@ for i in range (1,11): #201
     # If the txt contains these, idk if it will in the final txtsave, maybe useful lateron
     #    bins = res['bins']
 
-    # funtions used in early version of extrapolation
-#def find_nearest(array, value):
-#    array = np.asarray(array)
-#    idx = (np.abs(array - value)).argmin()
-#        return array[idx]
-
-#    def find_index(array, value):
-#        index = array.tolist().index(value)
-#        return index
-
-#    def find_expectation_value(lookuptable,xaxis ,yaxis ,xval,yval): #first version
-#        interpolating = RegularGridInterpolator((np.linspace(1, bins, bins), np.linspace(1, bins, bins)), lookuptable.T)
-#        xindex = find_index(xaxis, find_nearest(xaxis, xval))
-#        yindex = find_index(yaxis, find_nearest(yaxis, yval))
-#        exp_val2 =  lookuptable.T[xindex][yindex] #now gives a z value like the colorbar for that specific pixel/bin, but interpolation counts different
-#        expectation_val = interpolating((xindex+1,yindex+1))
-#        return print('exp val using hist:', exp_val2, '\nexp val using interpolation:',expectation_val, '\n', 'x:', xindex, 'y:', yindex)
-
-
-
-        # Testing on some data, trying to calculate SCALED WIDTH
+        # data manipulation to include only NON-ZERO events
     length_selection = length.ravel() != 0
     width_selection = width.ravel() != 0
 
@@ -122,55 +111,62 @@ for i in range (1,11): #201
     test_width_impact = impact.ravel()[width_selection]
     test_width_intensity = intensity.ravel()[width_selection]
 
-
+    # interpolation
     exp_length_interpol = find_exp_value(length_hist, length_hist_x, length_hist_y, test_length_impact, test_length_intensity)
     exp_std_length_interpol = find_exp_value(stdLengthapprox, length_hist_x, length_hist_y, test_length_impact, test_length_intensity)
 
     exp_width_interpol = find_exp_value(width_hist, width_hist_x, width_hist_y, test_width_impact, test_width_intensity)
     exp_std_width_interpol = find_exp_value(stdWidthapprox, width_hist_x, width_hist_y, test_width_impact, test_width_intensity)
 
-
-    SCL = (test_length_value - exp_length_interpol) / exp_std_length_interpol
-    SCL_nonnan = SCL[~np.isnan(SCL)]
-    SCL_noninf = SCL_nonnan[~np.isinf(SCL_nonnan)]
-    SCL_noninf2 = SCL_noninf[SCL_noninf>-10000]
-    SCL_noninf3 = SCL_noninf2[SCL_noninf2<10000]
+    #calculating Scaled Values
+    SCL = calc_SC_Value(test_length_value, exp_length_interpol, exp_std_length_interpol)
     avg_SCL  = (np.average(test_length_value[~np.isnan(test_length_value)]) - np.average(exp_length_interpol[~np.isnan(exp_length_interpol)])) / np.average(exp_std_length_interpol[~np.isnan(exp_std_length_interpol)])
 
-    SCW = (test_width_value - exp_width_interpol) / exp_std_width_interpol
-    SCW_nonnan = SCW[~np.isnan(SCW)]
-    SCW_noninf = SCW_nonnan[~np.isinf(SCW_nonnan)]
-    SCW_noninf2 = SCW_noninf[SCW_noninf>-10000]
-    SCW_noninf3 = SCW_noninf2[SCW_noninf2<10000]
+    SCW = calc_SC_Value(test_width_value, exp_width_interpol, exp_std_width_interpol)
     avg_SCW = (np.average(test_width_value[~np.isnan(test_width_value)]) - np.average(exp_width_interpol[~np.isnan(exp_width_interpol)])) / np.average(exp_std_width_interpol[~np.isnan(exp_std_width_interpol)])
 
-    length_value_array.append(np.average(test_length_value[~np.isnan(test_length_value)]))
-    length_interpol_array.append(np.average(exp_length_interpol[~np.isnan(exp_length_interpol)]))
-    std_length_interpol_array.append(np.average(exp_std_length_interpol[~np.isnan(exp_std_length_interpol)]))
-    SCL_array.append(np.average(SCL_noninf3))
+    #length_value_array.append(np.average(test_length_value[~np.isnan(test_length_value)]))
+    #length_interpol_array.append(np.average(exp_length_interpol[~np.isnan(exp_length_interpol)]))
+    #std_length_interpol_array.append(np.average(exp_std_length_interpol[~np.isnan(exp_std_length_interpol)]))
+    SCL_array.append(np.average(SCL))
     avg_SCL_array.append(avg_SCL)
 
 
-    width_value_array.append(np.average(test_width_value[~np.isnan(test_width_value)]))
-    width_interpol_array.append(np.average(exp_width_interpol[~np.isnan(exp_width_interpol)]))
-    std_width_interpol_array.append(np.average(exp_std_width_interpol[~np.isnan(exp_std_width_interpol)]))
-    SCW_array.append(np.average(SCW_noninf3))
+    #width_value_array.append(np.average(test_width_value[~np.isnan(test_width_value)]))
+    #width_interpol_array.append(np.average(exp_width_interpol[~np.isnan(exp_width_interpol)]))
+    #std_width_interpol_array.append(np.average(exp_std_width_interpol[~np.isnan(exp_std_width_interpol)]))
+    SCW_array.append(np.average(SCW))
     avg_SCW_array.append(avg_SCW)
 
+    # histogram distribution plots of SCL and SCW
+    SCL_hist_array = np.add(np.zeros(SCL.shape), SCL)
+    SCW_hist_array.append(np.sum(np.zeros(SCW.shape), SCW))
+
     #plt.hist(SCW_noninf, bins=100, range=(-10,10)) # useful for seeing the distribution of the SCW to determine if gaussian
-    plt.hist(SCL_noninf3, bins=100, range=(-10,10)) # useful for seeing the distribution of the SCW to determine if gaussian
+    plt.hist(SCL, bins=100, range=(-10,10)) # useful for seeing the distribution of the SCW to determine if gaussian
     plt.title('SCL Distribution')
 
 # doing a testplot of the 2D- histogram to see if everything imported fine/to inspect the lookup table
 
-fig, ax = plt.subplots(figsize=(6,5))
-fig.suptitle('Lookup table for expected Energy')
-im = ax.imshow(energy_hist, origin='lower', extent=(np.min(energy_hist_x),np.max(energy_hist_x),np.min(energy_hist_y),np.max(energy_hist_y)), aspect='auto')
-ax.set_xlabel('Impact Distance in meters')
-ax.set_ylabel('log10(Intensity) in PE')
-ax.set_xlim((0, 400))
-ax.set_ylim((1.5, 4))
-ax.set_xticks(np.linspace(0,400,9))
-ax.set_yticks(np.linspace(1.5,4,6))
-plt.colorbar(im, label='Avg Energy in PE')
-plt.show()
+#fig, ax = plt.subplots(figsize=(6,5))
+#fig.suptitle('Lookup table for expected Energy')
+#im = ax.imshow(energy_hist, origin='lower', extent=(np.min(energy_hist_x),np.max(energy_hist_x),np.min(energy_hist_y),np.max(energy_hist_y)), aspect='auto')
+#ax.set_xlabel('Impact Distance in meters')
+#ax.set_ylabel('log10(Intensity) in PE')
+#ax.set_xlim((0, 400))
+#ax.set_ylim((1.5, 4))
+#ax.set_xticks(np.linspace(0,400,9))
+#ax.set_yticks(np.linspace(1.5,4,6))
+#plt.colorbar(im, label='Avg Energy in PE')
+#plt.show()
+
+
+
+#def find_nearest(array, value):
+#    array = np.asarray(array)
+#    idx = (np.abs(array - value)).argmin()
+#        return array[idx]
+
+#    def find_index(array, value):
+#        index = array.tolist().index(value)
+#        return index
