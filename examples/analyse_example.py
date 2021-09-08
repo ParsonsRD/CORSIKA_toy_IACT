@@ -6,22 +6,29 @@ import matplotlib.pyplot as plt
 from ctapipe.image import tailcuts_clean
 from ctapipe.image.hillas import hillas_parameters, HillasParameterizationError
 
+#def make_plot()
+
+
 # accessing dataset & filepaths
 #data_dir = pkg_resources.resource_filename('corsika_toy_iact', 'data/gammas_0deg/')
 data_dir  = '/Users/julianrypalla/PycharmProjects/CORSIKA_toy_IACT/corsika_toy_iact/data/'
 #save_dir = pkg_resources.resource_filename('corsika_toy_iact', 'save_dir/InterpolTest/')
 save_dir = '/Users/julianrypalla/PycharmProjects/CORSIKA_toy_IACT/corsika_toy_iact/save_dir/'
 
-#for i in range (1,10):
-    #data_i = 'CER00000' + str(i) + '.image.npz'
-#for i in range (10,100):
-    #data_i ='CER0000' + str(i) + '.image.npz'
-for i in range (100,201):
-    data_i = 'CER000' + str(i) + '.image.npz'
+for i in range (1,2): #201
+    if i < 10:
+        data_i = 'CER00000' + str(i) + '.image.npz'
+    elif i > 9 and i < 100:
+        data_i = 'CER0000' + str(i) + '.image.npz'
+    elif i > 99:
+        data_i = 'CER000' + str(i) + '.image.npz'
+    elif i > 201 : break
 
+    #data_i = 'CER000' + str(i) + '.image.npz'
     dataset = "gammas_0deg/"+data_i #"EPOS_10000GeV_proton.root"
     filepath = data_dir+dataset
     print('Now analyzing dataset', data_i)
+
     # setting up the IACT array
     if 'proton' in dataset:
         positions = [[0,0],[20,0],[40,0],[60,0],[80,0],[100,0],[120,0],[140,0],[160,0],[180,0],[200,0],[220,0],[240,0],[260,0],[280,0],[300,0],[320,0],[340,0],[360,0],[380,0],[400,0]]
@@ -53,10 +60,10 @@ for i in range (100,201):
     intensity = np.zeros((image_pe.shape[0], image_pe.shape[1]))
     width = np.zeros((image_pe.shape[0], image_pe.shape[1]))
     length = np.zeros((image_pe.shape[0], image_pe.shape[1]))
+
     for event in image_pe:
         for image in event:
-            mask = tailcuts_clean(geometry, image.ravel(),
-                                  picture_thresh=8, boundary_thresh=4).reshape(40, 40)
+            mask = tailcuts_clean(geometry, image.ravel(),picture_thresh=8, boundary_thresh=4).reshape(40, 40)
             image[np.invert(mask)] = 0
             try:
                 hill = hillas_parameters(geometry, image.ravel())
@@ -68,6 +75,7 @@ for i in range (100,201):
                 j += 1
 
         i += 1
+        print(j)
         j = 0
 
     # getting average & std values (into the right shape)
@@ -151,6 +159,38 @@ for i in range (100,201):
         plt.show()
 
     else: # for gamma data
+
+        def make_hist(selection, bins = 100, weights = False, squared = False):
+            if selection == 'intensity':
+                sel = intensity_selection
+            elif selection == 'width':
+                sel = width_selection
+            elif selection == 'length':
+                sel = length_selection
+            else: print('false selection chosen')
+
+            xaxis = impact.ravel()[sel]
+            yaxis = np.log10(intensity.T.ravel()[sel])
+            if weights == False:
+                weight = None
+            else:
+                if squared == False:
+                    if selection == 'intensity':
+                        weight =  energy_weight[sel]
+                    elif selection == 'width':
+                        weight =  width.T.ravel()[width_selection]
+                    elif selection == 'length':
+                        weight = length.T.ravel()[length_selection]
+                elif squared == True:
+                    if selection == 'intensity':
+                        weight =  (energy_weight[sel]**2)
+                        print('No need to calculate intensity^2 as we dont calc std of energy')
+                    elif selection == 'width':
+                        weight =  (width.T.ravel()[width_selection]**2)
+                    elif selection == 'length':
+                        weight = (length.T.ravel()[length_selection]**2)
+            return plt.hist2d(xaxis, yaxis, bins = bins, weights = weight)
+
         intensity_selection = intensity.T.ravel() != 0
         length_selection = length.T.ravel() != 0
         width_selection = width.T.ravel() != 0
@@ -261,7 +301,7 @@ for i in range (100,201):
 
     print('Now writing:'+ dataset+".txt")
     # writing everything into a textfile for later use
-    textfile = open(save_dir+dataset+".txt", "w+")
+    textfile = open(save_dir+dataset+"_Test_"+".txt", "w+")
     #textfile.write("#average_intensity \n")
     #np.savetxt(textfile, avg_intensity)
     #textfile.write("#average_length \n")
