@@ -87,7 +87,7 @@ for i in range (1,2): #201
         i += 1
         j = 0
         #print(i)
-        if i ==1000:print('needed',time.time()-starttime,'seconds for the first 1k images')
+        #if i ==1000:print('needed',time.time()-starttime,'seconds for the first 1k images')
         if i==5000:print('Half way done')
 
     endtime = time.time()
