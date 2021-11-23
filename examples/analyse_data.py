@@ -10,9 +10,9 @@ import time
 data_dir  = '/Users/julianrypalla/PycharmProjects/CORSIKA_toy_IACT/corsika_toy_iact/data/'
 save_dir = '/Users/julianrypalla/PycharmProjects/CORSIKA_toy_IACT/corsika_toy_iact/save_dir/'
 intensity, width, length, impact, header_energy = None, None, None, None, None #priming the arrays
+times = []
 
-
-for i in range (1,2): #201
+for i in range (1,201): #201
     if i < 10:
         data_i = 'CER00000' + str(i) + '.image.npz'
     elif i > 9 and i < 100:
@@ -23,7 +23,7 @@ for i in range (1,2): #201
 
     dataset = "gammas_0deg/"+data_i #"EPOS_10000GeV_proton.root"
     filepath = data_dir+dataset
-    print('Now analyzing dataset', data_i)
+    print('Now analyzing', data_i)
 
     # setting up the IACT array
     if 'proton' in dataset: #proton data
@@ -53,7 +53,7 @@ for i in range (1,2): #201
     else:
         header, image = iact_array.process_file_list(filepath)
 
-    print('starting HP calc')
+    #print('starting HP calc')
     starttime = time.time()
     image_pe = iact_array.scale_to_photoelectrons(psf_width=0.04, mirror_reflectivity=0.8, quantum_efficiency=0.2, pedestal_width=0.8, single_pe_width=0.5, photon_cut=10)
     geometry = iact_array.get_camera_geometry()
@@ -61,7 +61,6 @@ for i in range (1,2): #201
     intensity_event = np.zeros((image_pe.shape[0], image_pe.shape[1]))
     width_event = np.zeros((image_pe.shape[0], image_pe.shape[1]))
     length_event = np.zeros((image_pe.shape[0], image_pe.shape[1]))
-    print('starting loop')
     for event in image_pe:
         for image in event:
             mask = tailcuts_clean(geometry, image.ravel(),picture_thresh=8, boundary_thresh=4).reshape(40, 40)
@@ -74,24 +73,9 @@ for i in range (1,2): #201
                 j += 1
             except HillasParameterizationError:
                 j += 1
-
-        if intensity is None:
-            intensity = intensity_event
-            width = width_event
-            length = length_event
-        else:
-            intensity = np.concatenate((intensity, intensity_event))
-            width = np.concatenate((width, width_event))
-            length = np.concatenate((length, length_event))
-
         i += 1
         j = 0
-        #print(i)
-        #if i ==1000:print('needed',time.time()-starttime,'seconds for the first 1k images')
-        if i==5000:print('Half way done')
 
-    endtime = time.time()
-    print('finished HP calc in', endtime-starttime,'seconds,now doing impact dist')
 
     # calculate impact distance
     if "proton" in dataset:
@@ -103,8 +87,26 @@ for i in range (1,2): #201
         impact_val = np.sqrt((header['core_x'][:, np.newaxis] - telescope_x) ** 2 + (header['core_y'][:, np.newaxis] - telescope_y) ** 2)
         header_energy_val = header['energy']
 
-    impact = np.concatenate((impact, impact_val))
-    header_energy = np.concatenate((header_energy, header_energy_val))
+    if intensity is None:
+        intensity = intensity_event
+        width = width_event
+        length = length_event
+        impact = impact_val
+        header_energy = header_energy_val
+    else:
+        intensity = np.concatenate((intensity, intensity_event))
+        width = np.concatenate((width, width_event))
+        length = np.concatenate((length, length_event))
+        impact = np.concatenate((impact, impact_val))
+        header_energy = np.concatenate((header_energy, header_energy_val))
+
+
+    endtime = time.time()
+    timeinterval = endtime-starttime
+    times = np.append(times, timeinterval)
+    print('HP calculation took', np.around(timeinterval,2),'seconds')
+
+
 
 
 def make_hist(selection, bins=100, weights=False, squared=False):
@@ -117,26 +119,59 @@ def make_hist(selection, bins=100, weights=False, squared=False):
     else:
         print('false selection chosen')
 
-    xaxis = impact.ravel()[sel]
-    yaxis = np.log10(intensity.T.ravel()[sel])
+    xaxis = impact[sel]
+    yaxis = np.log10(intensity[sel])
     if weights == False:
         weight = None
     else:
         if squared == False:
             if selection == 'intensity':
-                weight = energy_weight[sel]
+                weight = energy_weight[sel.ravel()]
             elif selection == 'width':
-                weight = width.T.ravel()[width_selection]
+                weight = width[width_selection]
             elif selection == 'length':
-                weight = length.T.ravel()[length_selection]
+                weight = length[length_selection]
         elif squared == True:
             if selection == 'intensity':
-                weight = (energy_weight[sel] ** 2)
-                print('No need to calculate intensity^2 as we dont calc std of energy')
+                weight = (energy_weight[sel.ravel()] ** 2)
+                #print('No need to calculate intensity^2 as we dont calc std of energy')
             elif selection == 'width':
-                weight = (width.T.ravel()[width_selection] ** 2)
+                weight = (width[width_selection] ** 2)
             elif selection == 'length':
-                weight = (length.T.ravel()[length_selection] ** 2)
+                weight = (length[length_selection] ** 2)
     return plt.hist2d(xaxis, yaxis, bins=bins, weights=weight)
 
-make_hist('width',bins=100, weights=False, squared=False)
+
+intensity_selection = intensity != 0
+length_selection = length != 0
+width_selection = width != 0
+energy_weight = np.repeat(header_energy, 9)
+
+#make_hist('width',bins=100, weights=False, squared=False)
+
+#hists = []
+#for type in ('intensity', 'width', 'length'):
+#    for weighted in (True, False):
+#        if weighted == True:
+#           for squaring in (True, False):
+#               hists = np.append(hists, make_hist(type, bins=100,weights=weighted,squared=squaring)[0].ravel())
+#        else:
+#           hists = np.append(hists, make_hist(type, bins=100,weights=weighted,squared=squaring)[0].ravel())
+# What I probably need to do is to convert this array to a dictionary instead, but f**k that for now
+
+print('Now writing:' + "Gamma_run1.txt")
+textfile = open(save_dir + "Gamma_run1.txt", "w+")
+textfile.write('#intensity \n')
+np.savetxt(textfile, intensity.ravel())
+textfile.write('#length \n')
+np.savetxt(textfile, length.ravel())
+textfile.write('#width \n')
+np.savetxt(textfile, width.ravel())
+textfile.write('#energy \n')
+np.savetxt(textfile, header_energy)
+if "proton" in dataset:
+    textfile.close()
+else:
+    textfile.write('#impact_dist \n')
+    np.savetxt(textfile, impact.ravel())
+    textfile.close()
