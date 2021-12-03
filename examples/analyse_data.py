@@ -12,24 +12,25 @@ save_dir = '/Users/julianrypalla/PycharmProjects/CORSIKA_toy_IACT/corsika_toy_ia
 intensity, width, length, impact, header_energy = None, None, None, None, None #priming the arrays
 times = []
 
-for i in range (1,201): #201
+for i in range (1,101): #201
     if i < 10:
         data_i = 'CER00000' + str(i) + '.image.npz'
     elif i > 9 and i < 100:
         data_i = 'CER0000' + str(i) + '.image.npz'
     elif i > 99:
         data_i = 'CER000' + str(i) + '.image.npz'
-    elif i > 201 : break
+    elif i > 101 : break
 
-    dataset = "gammas_0deg/"+data_i #"EPOS_10000GeV_proton.root"
+    dataset = "EPOS_1TeV_p/"+data_i
+        #"gammas_0deg/"+data_i for gamma files
     filepath = data_dir+dataset
     print('Now analyzing', data_i)
 
     # setting up the IACT array
-    if 'proton' in dataset: #proton data
-        positions = [[0,0],[20,0],[40,0],[60,0],[80,0],[100,0],[120,0],[140,0],[160,0],[180,0],[200,0],[220,0],[240,0],[260,0],[280,0],[300,0],[320,0],[340,0],[360,0],[380,0],[400,0]]
+    if 'proton' in dataset or 'EPOS_1TeV' in dataset: #proton data
+        positions = [[0,0],[40,0],[80,0],[120,0],[160,0],[200,0],[240,0],[280,0],[320,0],[360,0],[400,0]]
         iact_array = iact.IACTArray(positions, radius=6, multiple_cores=False)
-    if '0deg' in dataset: #gamma dataset
+    elif '0deg' in dataset: #gamma dataset
         x = np.linspace(-120, 120, 3)
         xx, yy = np.array(np.meshgrid(x, x))
         positions = np.vstack((xx.ravel(), yy.ravel())).T
@@ -44,12 +45,11 @@ for i in range (1,201): #201
     telescope_y = np.array([pos[1] for pos in positions])
 
     # processing image
-    if '0deg' in dataset: # Create new images
+    if '0deg' in dataset or 'EPOS_1TeV' in dataset: # Create new images
         loaded = np.load(filepath)
         images_loaded = loaded["images"].astype("float32")
         header = loaded["header"]
         iact_array.images = images_loaded
-
     else:
         header, image = iact_array.process_file_list(filepath)
 
@@ -76,12 +76,11 @@ for i in range (1,201): #201
         i += 1
         j = 0
 
-
     # calculate impact distance
-    if "proton" in dataset:
-        pass
-    if '0deg' in dataset: # Create new images
-        impact_val = np.sqrt((header.T[5][:, np.newaxis] - telescope_x)**2 + (header.T[6][:, np.newaxis] - telescope_y)**2) #header_loaded.T[5] is core_x
+    if "EPOS_1TeV" in dataset:
+        header_energy_val = header.T[1] #array of size (1000,) that's full of 1000 (GeV)
+    elif '0deg' in dataset: # Create new images
+        impact_val = np.sqrt((header.T[5][:, np.newaxis] - telescope_x)**2 + (header.T[6][:, np.newaxis] - telescope_y)**2) #header.T[5] is core_x
         header_energy_val = header.T[1]
     else:
         impact_val = np.sqrt((header['core_x'][:, np.newaxis] - telescope_x) ** 2 + (header['core_y'][:, np.newaxis] - telescope_y) ** 2)
@@ -91,14 +90,21 @@ for i in range (1,201): #201
         intensity = intensity_event
         width = width_event
         length = length_event
-        impact = impact_val
         header_energy = header_energy_val
+        if "p" in dataset:
+            impact = impact
+        else:
+            impact = impact_val
+
     else:
         intensity = np.concatenate((intensity, intensity_event))
         width = np.concatenate((width, width_event))
         length = np.concatenate((length, length_event))
-        impact = np.concatenate((impact, impact_val))
         header_energy = np.concatenate((header_energy, header_energy_val))
+        if "p" in dataset:
+            impact = impact
+        else:
+            impact = np.concatenate((impact, impact_val))
 
 
     endtime = time.time()
@@ -158,9 +164,12 @@ energy_weight = np.repeat(header_energy, 9)
 #        else:
 #           hists = np.append(hists, make_hist(type, bins=100,weights=weighted,squared=squaring)[0].ravel())
 # What I probably need to do is to convert this array to a dictionary instead, but f**k that for now
+x_coord_pos = []
+for i in range(0,len(positions)):
+    x_coord_pos.append(positions[i][0])
 
-print('Now writing:' + "Gamma_run1.txt")
-textfile = open(save_dir + "Gamma_run1.txt", "w+")
+print('Now writing:' + "EPOS_test2.txt")
+textfile = open(save_dir + "EPOS_test2.txt", "w+")
 textfile.write('#intensity \n')
 np.savetxt(textfile, intensity.ravel())
 textfile.write('#length \n')
@@ -169,7 +178,9 @@ textfile.write('#width \n')
 np.savetxt(textfile, width.ravel())
 textfile.write('#energy \n')
 np.savetxt(textfile, header_energy)
-if "proton" in dataset:
+if "EPOS_1TeV" in dataset:
+    textfile.write('#positions \n')
+    np.savetxt(textfile, x_coord_pos)
     textfile.close()
 else:
     textfile.write('#impact_dist \n')
