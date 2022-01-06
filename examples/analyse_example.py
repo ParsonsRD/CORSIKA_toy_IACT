@@ -137,9 +137,6 @@ for i in range (1,2): #201
         ax.set_xlabel('telescope position in m')
         fig.text(0.02, 0.5, 'Hillas Parameters', ha='center', va='center', rotation='vertical')
 
-        #ax1.errorbar(telescope_x, percentile_intensity, xerr=None, yerr = None, marker='x', ls='--', label='Intensity')
-        #ax2.errorbar(telescope_x, percentile_length, xerr=None, yerr = None, marker='x', ls='--', label='Length')
-        #ax3.errorbar(telescope_x, percentile_width, xerr=None, yerr = None, marker='x', ls='--',label='Width')
         ax1.errorbar(telescope_x, avg_intensity, xerr=None, yerr = None, marker='x', ls='--', label='avg intensity')
         ax2.errorbar(telescope_x, avg_length, xerr=None, yerr = None, marker='x', ls='--', label='avg length')
         ax3.errorbar(telescope_x, avg_width, xerr=None, yerr = None, marker='x', ls='--',label='avg width')
@@ -148,14 +145,12 @@ for i in range (1,2): #201
         ax1.grid()
         ax1.legend()
         ax1.set_ylabel('Intensity in photoelectrons')
-        #ax1.set_yscale("log")
         ax2.grid()
         ax2.legend()
         ax2.set_ylabel('Length in degree')
         ax3.grid()
         ax3.legend()
         ax3.set_ylabel('Width in degree')
-        #plt.savefig(save_dir+dataset+'.jpg')
         plt.show()
 
     else: # for gamma data

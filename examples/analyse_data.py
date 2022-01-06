@@ -12,22 +12,21 @@ save_dir = '/Users/julianrypalla/PycharmProjects/CORSIKA_toy_IACT/corsika_toy_ia
 intensity, width, length, impact, header_energy = None, None, None, None, None #priming the arrays
 times = []
 
-for i in range (1,101): #201
-    if i < 10:
-        data_i = 'CER00000' + str(i) + '.image.npz'
-    elif i > 9 and i < 100:
-        data_i = 'CER0000' + str(i) + '.image.npz'
-    elif i > 99:
-        data_i = 'CER000' + str(i) + '.image.npz'
-    elif i > 101 : break
+for k in range (1,101): #101 for proton
+    if k < 10:
+        data_k = 'CER00000' + str(k) + '.image.npz'
+    elif k > 9 and k < 100:
+        data_k = 'CER0000' + str(k) + '.image.npz'
+    elif k > 99:
+        data_k = 'CER000' + str(k) + '.image.npz'
+    elif k > 101 : break
 
-    dataset = "EPOS_1TeV_p/"+data_i
-        #"gammas_0deg/"+data_i for gamma files
+    dataset = "EPOS_1TeV_p/"+data_k #for gamma files #"EPOS_1TeV_p/"+data_k
     filepath = data_dir+dataset
-    print('Now analyzing', data_i)
+    print('Now analyzing', data_k)
 
     # setting up the IACT array
-    if 'proton' in dataset or 'EPOS_1TeV' in dataset: #proton data
+    if 'proton' in dataset or 'p' in dataset: #proton data
         positions = [[0,0],[40,0],[80,0],[120,0],[160,0],[200,0],[240,0],[280,0],[320,0],[360,0],[400,0]]
         iact_array = iact.IACTArray(positions, radius=6, multiple_cores=False)
     elif '0deg' in dataset: #gamma dataset
@@ -45,7 +44,7 @@ for i in range (1,101): #201
     telescope_y = np.array([pos[1] for pos in positions])
 
     # processing image
-    if '0deg' in dataset or 'EPOS_1TeV' in dataset: # Create new images
+    if '0deg' in dataset or 'p' in dataset: # Create new images
         loaded = np.load(filepath)
         images_loaded = loaded["images"].astype("float32")
         header = loaded["header"]
@@ -67,17 +66,20 @@ for i in range (1,101): #201
             image[np.invert(mask)] = 0
             try:
                 hill = hillas_parameters(geometry, image.ravel())
-                intensity_event[i][j] = hill.intensity
-                width_event[i][j] = hill.width.value
-                length_event[i][j] = hill.length.value
-                j += 1
+                if hill.intensity > 60:                                   #filtering only images with intensity above 60
+                    intensity_event[i][j] = hill.intensity
+                    width_event[i][j] = hill.width.value
+                    length_event[i][j] = hill.length.value
+                    j += 1
+                else:
+                    j+=1
             except HillasParameterizationError:
                 j += 1
         i += 1
         j = 0
 
     # calculate impact distance
-    if "EPOS_1TeV" in dataset:
+    if "p" in dataset:
         header_energy_val = header.T[1] #array of size (1000,) that's full of 1000 (GeV)
     elif '0deg' in dataset: # Create new images
         impact_val = np.sqrt((header.T[5][:, np.newaxis] - telescope_x)**2 + (header.T[6][:, np.newaxis] - telescope_y)**2) #header.T[5] is core_x
@@ -91,6 +93,7 @@ for i in range (1,101): #201
         width = width_event
         length = length_event
         header_energy = header_energy_val
+        #impact = impact_val
         if "p" in dataset:
             impact = impact
         else:
@@ -101,8 +104,9 @@ for i in range (1,101): #201
         width = np.concatenate((width, width_event))
         length = np.concatenate((length, length_event))
         header_energy = np.concatenate((header_energy, header_energy_val))
+        #impact = np.concatenate((impact, impact_val))
         if "p" in dataset:
-            impact = impact
+            pass
         else:
             impact = np.concatenate((impact, impact_val))
 
@@ -168,8 +172,8 @@ x_coord_pos = []
 for i in range(0,len(positions)):
     x_coord_pos.append(positions[i][0])
 
-print('Now writing:' + "EPOS_test2.txt")
-textfile = open(save_dir + "EPOS_test2.txt", "w+")
+print('Now writing:' + "EPOS_1.txt")
+textfile = open(save_dir + "EPOS_1.txt", "w+")
 textfile.write('#intensity \n')
 np.savetxt(textfile, intensity.ravel())
 textfile.write('#length \n')
@@ -178,7 +182,7 @@ textfile.write('#width \n')
 np.savetxt(textfile, width.ravel())
 textfile.write('#energy \n')
 np.savetxt(textfile, header_energy)
-if "EPOS_1TeV" in dataset:
+if "p" in dataset:
     textfile.write('#positions \n')
     np.savetxt(textfile, x_coord_pos)
     textfile.close()
