@@ -23,13 +23,13 @@ def readfile(datafile):
     return res
 
     # Interpolation used later
+
 def find_exp_value(lookuptable,xaxis ,yaxis ,xval,yval):
     xaxis_cent = xaxis[:-1] + np.diff(xaxis)/2
     yaxis_cent = yaxis[:-1] + np.diff(yaxis)/2
     interpol = RegularGridInterpolator((xaxis_cent, yaxis_cent), lookuptable, method='nearest' ,bounds_error=False, fill_value=-100) #method='nearest' gives the choppy pixel-by-pixel value instead of this "gradient" rn
     exp_val = interpol((xval,yval))
     return exp_val #print('exp val using interpolation:', exp_val),
-
 
 def calc_SC_Value(val, exp, std, boundary = 10000):
     '''calculates Scaled Value, Width or Length
@@ -101,61 +101,70 @@ def calc_tel_avg(array):
         avg_array = np.append(avg_array, np.average(array.T[tel]))
     return avg_array
 
-def HP_comp_plot(epos,qgs,sibyll, param):
+def HP_comp_plot(E, epos,qgs,sibyll, param):
     plt.clf()
     plt.plot(p_position, epos / epos, label='EPOS', color='red')
     plt.plot(p_position, qgs / epos, label='QGS', color='green')
     plt.plot(p_position, sibyll / epos, label='SIBYLL', color='blue')
-    plt.title('Avg {} HP at 1TeV compared to EPOS'.format(param))
+    plt.title('Avg {} HP at'.format(param)+ E +  'compared to EPOS')
     plt.xlabel('Telescope Position in m')
     plt.ylabel('relative {} Parameter'.format(param))
     plt.legend()
     plt.grid()
     plt.show
 
-def passing_both(lengtharr,widtharr):
-    '''ok so the theory here is that only those entries that are nonzero in the length and width array get used to
-    calculate SCL/W down the line, so im basically deploying (very slow) loops that get the indices of those non-zero
-    entries and save them in the 'SCX_indices' array,  then I loop over all indices that produce SCWs (because i know
-    its smaller) and try to match each index in there with one from SCL and discard those that dont match,
-    but apparently every entry in SCW matches with SCL but not other way around'''
-    starttime_now=time.time()
-    SCW_indices = []
-    SCL_indices = []
-    final_index_arr = []
+def showhist(hist):         ## TO SHOW HISTS
+    fig, ax = plt.subplots(figsize=(6, 5))
+    fig.suptitle('Lookup table for expected length')
+    im = ax.imshow(hist.T, origin='lower',extent=(0, np.max(length_w[1])-5, 0, np.max(length_w[2])-0.05), aspect='auto')
+    ax.set_xlabel('Impact Distance in meters')
+    ax.set_ylabel('log10(Intensity) in PE')
+    ax.set_xlim((0, 400))
+    ax.set_ylim((0, 4))
+    ax.set_xticks(np.linspace(0, 400, 9))
+    ax.set_yticks(np.linspace(0, 4, 9))
+    plt.colorbar(im, label='Avg Length in degree')
+    return plt.show()
 
-    lengtharr_selection = lengtharr != 0
-    widtharr_selection = widtharr != 0
-    for i in range(widtharr_selection.size):
-        if widtharr_selection.ravel()[i] == True:
-            SCW_indices = np.append(SCW_indices, i)
-        else:
-            pass
-    for j in range(lengtharr_selection.size):
-        if lengtharr_selection.ravel()[j] == True:
-            SCL_indices = np.append(SCL_indices, j)
-        else:
-            pass
-    for k in range(SCW_indices.size):
-        index_no = SCW_indices.ravel()[k]
-        if index_no in SCL_indices:
-            final_index_arr = np.append(final_index_arr, index_no)
-        else:
-            pass
-    print('running took', time.time()-starttime_now, 'seconds')
-    return final_index_arr
+def one_tel_SC(i, intensity_array, length_array, width_array):
+    proton_i_pos = np.repeat(p_position[i], intensity_array.T[i].size)
+    proton_i_intensity = intensity_array.T[i]
+
+    proton_i_length = length_array.T[i]
+    proton_i_length_selection = length_array.T[i] != 0
+    proton_i_width = width_array.T[i]
+    proton_i_width_selection = width_array.T[i] != 0
+
+    proton_i_exp_length_interpol = find_exp_value(length_hist, length_w[1], length_w[2],
+                                              proton_i_pos[proton_i_length_selection],np.log10(proton_i_intensity[proton_i_length_selection]))
+    proton_i_exp_std_length_interpol = find_exp_value(stdLengthapprox, length_w[1], length_w[2],
+                                              proton_i_pos[proton_i_length_selection],np.log10(proton_i_intensity[proton_i_length_selection]))
+    proton_i_exp_width_interpol = find_exp_value(width_hist, width_w[1], width_w[2], proton_i_pos[proton_i_width_selection],
+                                             np.log10(proton_i_intensity[proton_i_width_selection]))
+    proton_i_exp_std_width_interpol = find_exp_value(stdWidthapprox, width_w[1], width_w[2], proton_i_pos[proton_i_width_selection],
+                                             np.log10(proton_i_intensity[proton_i_width_selection]))
+
+    proton_i_SCL = (proton_i_length[proton_i_length_selection] - proton_i_exp_length_interpol) / proton_i_exp_std_length_interpol
+    proton_i_SCW = (proton_i_width[proton_i_width_selection] - proton_i_exp_width_interpol) / proton_i_exp_std_width_interpol
+    return proton_i_SCL, proton_i_SCW
+
+def passing_both(SCL ,SCW):
+    SCW_fill = np.full(SCL.size-SCW.size, 100)
+    SCW_added = np.append(SCW, SCW_fill)
+    proton_passing_both = SCL[np.logical_and(SCL <= SCL_cutoff_param , SCW_added <= SCW_cutoff_param)]
+    return proton_passing_both
 
 #starting the real code:
 ## READING IN FILES
 starttime = time.time()
 print('Starting to run and read in the Gamma file')
 save_dir = pkg_resources.resource_filename('corsika_toy_iact', 'save_dir/')
-filepath = save_dir+'Gamma_run1.txt' #Gamma_run_0_first50images
+filepath = save_dir+'Gamma_latest.txt' #Gamma_run_0_first50images
 Gamma_res = readfile(filepath)
 print('file read in')
 
 print('Now reading in the first proton file: EPOS')
-filename_p1= 'EPOS_1.txt'
+filename_p1= 'EPOS_10TeV.txt'
 filepath_p1 = save_dir+filename_p1 #Gamma_run_0_first50images
 EPOS_res = readfile(filepath_p1)
 print('file read in')
@@ -163,13 +172,13 @@ print('file read in')
 compareProton = True
 if compareProton == True:
     print('Now reading in the 2nd proton file: QGS')
-    filename_p2 = 'QGS_1.txt'
+    filename_p2 = 'QGS_10TeV.txt'
     filepath_p2 = save_dir + filename_p2  # Gamma_run_0_first50images
     QGS_res = readfile(filepath_p2)
     print('file read in')
 
-    print('Now reading in the 3nd proton file: SIBYLL')
-    filename_p3 = 'SIBYLL_1.txt'
+    print('Now reading in the 3rd proton file: SIBYLL')
+    filename_p3 = 'SIBYLL_10TeV.txt'
     filepath_p3 = save_dir + filename_p3  # Gamma_run_0_first50images
     SIBYLL_res = readfile(filepath_p3)
     print('file read in')
@@ -245,19 +254,6 @@ length_hist = gaussian_filter(length_div, sigma=gaussigma)
 stdWidthapprox = gaussian_filter(stdWidthapprox, sigma=gaussigma)
 stdLengthapprox = gaussian_filter(stdLengthapprox, sigma=gaussigma)
 
-## TO SHOW HISTS
-def showhist(hist):
-    fig, ax = plt.subplots(figsize=(6, 5))
-    fig.suptitle('Lookup table for expected length')
-    im = ax.imshow(hist, origin='lower',extent=(0, np.max(length_w[1])-5, 0, np.max(length_w[2])-5), aspect='auto')
-    ax.set_xlabel('Impact Distance in meters')
-    ax.set_ylabel('log10(Intensity) in PE')
-    ax.set_xlim((0, 400))
-    ax.set_ylim((0, 4))
-    ax.set_xticks(np.linspace(0, 400, 9))
-    ax.set_yticks(np.linspace(0, 4, 9))
-    plt.colorbar(im, label='Avg Length in degree')
-    return plt.show()
 
 ## GETTING GAMMA VALUES FOR FURTHER CALCULATIONS
 intensity_selection = intensity != 0
@@ -270,15 +266,6 @@ length_intensity = intensity[length_selection]
 width_value = width[width_selection]
 width_impact = impact[width_selection]
 width_intensity = intensity[width_selection]
-
-## IMPORTANT ##
-#Something something (xval,yval) for interpolation into the right shape like follows
-
-# p_position has shape (11,) which i can use as my x coord, in steps of 40m
-    # p_intensity has shape (100000, 11) meaning that for all of the 11 telescopes, there are 100k events
-# p_intensity.T[0] gives me all events for the 0th telescope (at x=0) and so on
-# so i need to get it into the right ZUSAMMENSCHLUSS of x and y for the interpolation
-# kind of like p_interpol((p_position,p_intensity.T)) but using only the 1st dimension of the intensity array and disregarding the 2nd which's (11,)
 
 
 ## GETTING PROTON VALUES FOR FURTHER CALCULATIONS
@@ -371,7 +358,8 @@ EPOS_exp_std_width_interpol = find_exp_value(stdWidthapprox, width_w[1], width_w
 EPOS_SCL = (final_EPOS_length[EPOS_length_selection] - EPOS_exp_length_interpol) / EPOS_exp_std_length_interpol
 EPOS_SCW = (final_EPOS_width[EPOS_width_selection] - EPOS_exp_width_interpol) / EPOS_exp_std_width_interpol
 
-# Calculates SC/W for QGS and SIBYLL
+
+# Calculates SCL/W for QGS and SIBYLL
 if compareProton == True:
     QGS_exp_length_interpol = find_exp_value(length_hist, length_w[1], length_w[2], final_QGS_pos[QGS_length_selection],np.log10(final_QGS_intens[QGS_length_selection]))
     QGS_exp_std_length_interpol = find_exp_value(stdLengthapprox, length_w[1], length_w[2],final_QGS_pos[QGS_length_selection],np.log10(final_QGS_intens[QGS_length_selection]))
@@ -529,8 +517,8 @@ if compareProton == True:
     avg_SIBYLL_l = calc_tel_avg(SIBYLL_length)
     avg_SIBYLL_w = calc_tel_avg(SIBYLL_width)
 
-    HP_comp_plot(avg_EPOS_l,avg_QGS_l,avg_SIBYLL_l, 'Length')
-    HP_comp_plot(avg_EPOS_w,avg_QGS_w,avg_SIBYLL_w, 'Width')
+    #HP_comp_plot(100, avg_EPOS_l,avg_QGS_l,avg_SIBYLL_l, 'Length')
+    #HP_comp_plot(100, avg_EPOS_w,avg_QGS_w,avg_SIBYLL_w, 'Width')
 
 else:
     pass
@@ -538,29 +526,48 @@ else:
 SCL_cutoff_param = 1.0
 SCW_cutoff_param = 0.7
 
-EPOS_SCL_cutoff =  EPOS_SCL <= SCL_cutoff_param
-EPOS_SCW_cutoff =  EPOS_SCW <= SCW_cutoff_param
-EPOS_SCL_passing = EPOS_SCL[EPOS_SCL_cutoff].size/EPOS_length.size
-EPOS_SCW_passing = EPOS_SCW[EPOS_SCW_cutoff].size/EPOS_width.size
+
+
+EPOS_SCL0, EPOS_SCW0 = one_tel_SC(0, EPOS_intensity, EPOS_length, EPOS_width)
+EPOS_SCL120, EPOS_SCW120 = one_tel_SC(3, EPOS_intensity, EPOS_length, EPOS_width)
+EPOS_SCL200, EPOS_SCW200 = one_tel_SC(5, EPOS_intensity, EPOS_length, EPOS_width)
+EPOS_SCL320, EPOS_SCW320 = one_tel_SC(8, EPOS_intensity, EPOS_length, EPOS_width)
+EPOS_SCL400, EPOS_SCW400 = one_tel_SC(10, EPOS_intensity, EPOS_length, EPOS_width)
+
+EPOS_passing_both = passing_both(EPOS_SCL, EPOS_SCW)
+
+EPOS_passing_frac = EPOS_passing_both.size/EPOS_length[EPOS_length != 0].size
+
 if compareProton == True:
-    QGS_SCL_cutoff = QGS_SCL <= SCL_cutoff_param
-    QGS_SCW_cutoff = QGS_SCW <= SCW_cutoff_param
-    QGS_SCL_passing = QGS_SCL[QGS_SCL_cutoff].size / QGS_length.size
-    QGS_SCW_passing = QGS_SCW[QGS_SCW_cutoff].size / QGS_width.size
+    QGS_passing_both = passing_both(QGS_SCL, QGS_SCW)
+    QGS_passing_frac = QGS_passing_both.size/QGS_length[QGS_length != 0].size
 
-    SIBYLL_SCL_cutoff = SIBYLL_SCL <= SCL_cutoff_param
-    SIBYLL_SCW_cutoff = SIBYLL_SCW <= SCW_cutoff_param
-    SIBYLL_SCL_passing = SIBYLL_SCL[SIBYLL_SCL_cutoff].size / SIBYLL_length.size
-    SIBYLL_SCW_passing = SIBYLL_SCW[SIBYLL_SCW_cutoff].size / SIBYLL_width.size
+    SIBYLL_passing_both = passing_both(SIBYLL_SCL, SIBYLL_SCW)
+    SIBYLL_passing_frac = SIBYLL_passing_both.size/SIBYLL_length[SIBYLL_length != 0].size
 
+    QGS_SCL0,   QGS_SCW0   = one_tel_SC(0, QGS_intensity, QGS_length, QGS_width)
+    QGS_SCL120, QGS_SCW120 = one_tel_SC(3, QGS_intensity, QGS_length, QGS_width)
+    QGS_SCL200, QGS_SCW200 = one_tel_SC(5, QGS_intensity, QGS_length, QGS_width)
+    QGS_SCL320, QGS_SCW320 = one_tel_SC(8, QGS_intensity, QGS_length, QGS_width)
+    QGS_SCL400, QGS_SCW400 = one_tel_SC(10, QGS_intensity, QGS_length, QGS_width)
+
+    SIBYLL_SCL0, SIBYLL_SCW0 = one_tel_SC(0, SIBYLL_intensity, SIBYLL_length, SIBYLL_width)
+    SIBYLL_SCL120, SIBYLL_SCW120 = one_tel_SC(3, SIBYLL_intensity, SIBYLL_length, SIBYLL_width)
+    SIBYLL_SCL200, SIBYLL_SCW200 = one_tel_SC(5, SIBYLL_intensity, SIBYLL_length, SIBYLL_width)
+    SIBYLL_SCL320, SIBYLL_SCW320 = one_tel_SC(8, SIBYLL_intensity, SIBYLL_length, SIBYLL_width)
+    SIBYLL_SCL400, SIBYLL_SCW400 = one_tel_SC(10, SIBYLL_intensity, SIBYLL_length, SIBYLL_width)
 else:
     pass
 
+
 # useful for seeing the distribution of the SCW to determine if gaussian
 plt.clf()
-plt.hist(EPOS_SCL, bins=100, range=(-3,6) ,weights=np.zeros_like(EPOS_SCL) + 1. / EPOS_SCL.size, label=str(filename_p1), histtype='step', alpha=1, color='red')
-plt.hist(QGS_SCL, bins=100, range=(-3,6) ,weights=np.zeros_like(QGS_SCL) + 1. / QGS_SCL.size, label=str(filename_p2), histtype='step', alpha=1, color='green')
-plt.hist(SIBYLL_SCL, bins=100, range=(-3,6) ,weights=np.zeros_like(SIBYLL_SCL) + 1. / SIBYLL_SCL.size, label=str(filename_p3), histtype='step', alpha=1, color='blue')
+plt.hist(EPOS_SCL, bins=100, range=(-3,6) ,weights=np.zeros_like(EPOS_SCL) + 1. / EPOS_SCL.size, label='EPOS', histtype='step', alpha=1, color='red')
+if compareProton == True:
+    plt.hist(QGS_SCL, bins=100, range=(-3,6) ,weights=np.zeros_like(QGS_SCL) + 1. / QGS_SCL.size, label='QGS', histtype='step', alpha=1, color='green')
+    plt.hist(SIBYLL_SCL, bins=100, range=(-3,6) ,weights=np.zeros_like(SIBYLL_SCL) + 1. / SIBYLL_SCL.size, label='SIBYLL', histtype='step', alpha=1, color='blue')
+else:
+    pass
 plt.hist(gamma_SCL, bins=100, range=(-3,6),weights=np.zeros_like(gamma_SCL) + 1. / gamma_SCL.size, label='Gamma', histtype='step', alpha=1, color='black')
 plt.vlines(SCL_cutoff_param, 0, 0.07, linestyles='dashed', label='Cutoff')
 plt.xlabel('SCL')
@@ -569,7 +576,7 @@ plt.xticks(np.linspace(-3,6,10))
 plt.yticks(np.linspace(0,0.07,8))
 plt.grid(linestyle = '--', linewidth = 0.3)
 plt.legend()
-plt.title('SCL Distribution')
+plt.title('SCL Distribution across all Telescopes at 100 GeV') #at 0m core distance
 
 endtime = time.time()
 print('running took', endtime-starttime, 'seconds')

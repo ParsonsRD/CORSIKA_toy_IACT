@@ -21,15 +21,16 @@ for k in range (1,101): #101 for proton
         data_k = 'CER000' + str(k) + '.image.npz'
     elif k > 101 : break
 
-    dataset = "EPOS_1TeV_p/"+data_k #for gamma files #"EPOS_1TeV_p/"+data_k
+    datapath = "EPOS_100GeV_p/" #"gammas_0deg/" #for gamma files
+    dataset = datapath+data_k
     filepath = data_dir+dataset
     print('Now analyzing', data_k)
 
     # setting up the IACT array
-    if 'proton' in dataset or 'p' in dataset: #proton data
+    if 'proton' in datapath or 'p' in datapath: #proton data
         positions = [[0,0],[40,0],[80,0],[120,0],[160,0],[200,0],[240,0],[280,0],[320,0],[360,0],[400,0]]
         iact_array = iact.IACTArray(positions, radius=6, multiple_cores=False)
-    elif '0deg' in dataset: #gamma dataset
+    elif '0deg' in datapath: #gamma dataset
         x = np.linspace(-120, 120, 3)
         xx, yy = np.array(np.meshgrid(x, x))
         positions = np.vstack((xx.ravel(), yy.ravel())).T
@@ -44,7 +45,7 @@ for k in range (1,101): #101 for proton
     telescope_y = np.array([pos[1] for pos in positions])
 
     # processing image
-    if '0deg' in dataset or 'p' in dataset: # Create new images
+    if '0deg' in datapath or 'p' in datapath: # Create new images
         loaded = np.load(filepath)
         images_loaded = loaded["images"].astype("float32")
         header = loaded["header"]
@@ -79,14 +80,15 @@ for k in range (1,101): #101 for proton
         j = 0
 
     # calculate impact distance
-    if "p" in dataset:
+    if "p" in datapath:
         header_energy_val = header.T[1] #array of size (1000,) that's full of 1000 (GeV)
-    elif '0deg' in dataset: # Create new images
+    elif '0deg' in datapath: # Create new images
         impact_val = np.sqrt((header.T[5][:, np.newaxis] - telescope_x)**2 + (header.T[6][:, np.newaxis] - telescope_y)**2) #header.T[5] is core_x
         header_energy_val = header.T[1]
     else:
         impact_val = np.sqrt((header['core_x'][:, np.newaxis] - telescope_x) ** 2 + (header['core_y'][:, np.newaxis] - telescope_y) ** 2)
         header_energy_val = header['energy']
+
 
     if intensity is None:
         intensity = intensity_event
@@ -172,8 +174,8 @@ x_coord_pos = []
 for i in range(0,len(positions)):
     x_coord_pos.append(positions[i][0])
 
-print('Now writing:' + "EPOS_1.txt")
-textfile = open(save_dir + "EPOS_1.txt", "w+")
+print('Now writing:' + "EPOS_100GeV_new.txt")
+textfile = open(save_dir + "EPOS_100GeV_new.txt", "w+")
 textfile.write('#intensity \n')
 np.savetxt(textfile, intensity.ravel())
 textfile.write('#length \n')
@@ -182,7 +184,7 @@ textfile.write('#width \n')
 np.savetxt(textfile, width.ravel())
 textfile.write('#energy \n')
 np.savetxt(textfile, header_energy)
-if "p" in dataset:
+if "p" in datapath:
     textfile.write('#positions \n')
     np.savetxt(textfile, x_coord_pos)
     textfile.close()
